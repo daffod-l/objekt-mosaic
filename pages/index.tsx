@@ -18,11 +18,9 @@ export default function Home() {
 
   return (
     <div className="flex h-screen bg-white text-black">
-      {/* sidebar */}
       <div className="w-1/6 min-w-[200px] border-r border-gray-300 p-6 flex flex-col gap-6">
         <h2 className="text-xl font-bold">Objekt Mosaic</h2>
 
-        {/* upload image */}
         <div className="flex flex-col gap-2">
           <label className="font-bold">Upload Image</label>
 
@@ -40,7 +38,6 @@ export default function Home() {
 
         <span className="font-bold">Customise</span>
 
-        {/* slider for objekt count */}
         <div className="flex flex-col gap-2">
           <label className="font-medium">Count: {count}</label>
           <input
@@ -52,7 +49,6 @@ export default function Home() {
           />
         </div>
 
-        {/* specific member toggle */}
         <div className="flex items-center gap-2">
           <span className="font-medium">Select Members</span>
           <button
@@ -75,7 +71,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* main display */}
       <div className="flex-1 flex items-center justify-center">
         <Image
           src={uploadedImage || "/defaultImage.jpg"}
