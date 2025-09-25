@@ -1,40 +1,71 @@
 import { useState, useRef, useEffect } from "react";
 import NextImage from "next/image"; 
-import objekts from "../data/allobjekts.json";
+import allObjekts from "../data/allobjekts.json";
+import specialClassObjekts from "../data/specialclassobjekts.json";
 
 type RGB = { r: number; g: number; b: number };
 type ObjektWithAvg = { image: string; avg: RGB };
 
+const CLASSES = ["Special", "First", "Double", "Welcome", "Premier"] as const;
+type ClassType = (typeof CLASSES)[number] | null;
+
 export default function Home() {
   const [count, setCount] = useState(50);
-  const [specificMember, setSpecificMember] = useState(false);
+  const [selectedClass, setSelectedClass] = useState<ClassType>(null);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [fileName, setFileName] = useState(
-    "No file chosen yet. Currently using default image (Jiwoo)."
+    "No file chosen yet."
   );
 
   const [objektColors, setObjektColors] = useState<ObjektWithAvg[]>([]);
-
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // find avg color for all objekts
   useEffect(() => {
+    let source: typeof allObjekts;
+
+    if (selectedClass === "Special") {
+      source = specialClassObjekts;
+    } else {
+      source = allObjekts;
+    }
+
     const loadObjekts = async () => {
       const results: ObjektWithAvg[] = await Promise.all(
-        objekts.map(
+        source.map(
           (obj) =>
             new Promise<ObjektWithAvg>((resolve) => {
               const img = new window.Image();
               img.crossOrigin = "anonymous";
               img.src = obj.image;
-              img.onload = () => resolve({ image: obj.image, avg: getAverageColor(img) });
+              img.onload = () =>
+                resolve({ image: obj.image, avg: getAverageColor(img) });
             })
         )
       );
       setObjektColors(results);
     };
+
     loadObjekts();
-  }, []);
+  }, [selectedClass]);
+
+  // preview
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.src = uploadedImage || "/defaultImage.jpg";
+
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, img.width, img.height);
+    };
+  }, [uploadedImage]);
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -58,7 +89,7 @@ export default function Home() {
     img.onload = () => {
       const cols = count;
       const tileWidth = img.width / cols;
-      const tileHeight = tileWidth * 1.5; // 2:3 aspect ratio
+      const tileHeight = tileWidth * 1.5;
       const rows = Math.floor(img.height / tileHeight);
 
       canvas.width = img.width;
@@ -67,7 +98,6 @@ export default function Home() {
 
       for (let y = 0; y < rows; y++) {
         for (let x = 0; x < cols; x++) {
-          // temporary canvas to check average color of each tile.
           const tileCanvas = document.createElement("canvas");
           tileCanvas.width = tileWidth;
           tileCanvas.height = tileHeight;
@@ -85,10 +115,7 @@ export default function Home() {
           );
 
           const imageData = tileCtx.getImageData(0, 0, tileWidth, tileHeight).data;
-          let r = 0,
-            g = 0,
-            b = 0;
-
+          let r = 0, g = 0, b = 0;
           for (let i = 0; i < imageData.length; i += 4) {
             r += imageData[i];
             g += imageData[i + 1];
@@ -133,43 +160,57 @@ export default function Home() {
         </div>
 
         <span className="font-bold">Customise</span>
-
         <div className="flex flex-col gap-2">
           <label className="font-medium">Count: {count}</label>
           <input
             type="range"
             min={5}
-            max={200}
+            max={150}
             value={count}
             onChange={(e) => setCount(Number(e.target.value))}
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="font-medium">Select Members</span>
-          <button
-            onClick={() => setSpecificMember(!specificMember)}
-            className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${
-              specificMember ? "bg-black" : "bg-gray-300"
-            }`}
-          >
-            <div
-              className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
-                specificMember ? "translate-x-6" : "translate-x-0"
+        <div className="flex flex-col gap-2">
+          <span className="font-medium">Select Class</span>
+          <div className="flex flex-col gap-1">
+            <button
+              onClick={() => setSelectedClass(null)}
+              className={`mt-2 px-3 py-1 rounded border text-sm ${
+                selectedClass === null
+                  ? "bg-black text-white border-black"
+                  : "bg-white text-black border-gray-400 hover:bg-gray-200"
               }`}
-            ></div>
-          </button>
+            >
+              All (Default)
+            </button>
+            {CLASSES.map((cls) => (
+              <button
+                key={cls}
+                onClick={() => setSelectedClass(cls)}
+                className={`px-3 py-1 rounded border text-sm ${
+                  selectedClass === cls
+                    ? "bg-black text-white border-black"
+                    : "bg-white text-black border-gray-400 hover:bg-gray-200"
+                }`}
+              >
+                {cls}
+              </button>
+            ))}
+            
+          </div>
         </div>
-        {specificMember && (
-          <div className="flex flex-col gap-1 text-sm text-gray-600">[placeholder lol]</div>
-        )}
 
         <button
           onClick={handleGenerate}
-          className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition-colors duration-200"
+          className="bg-black text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors duration-200"
         >
           Generate Mosaic
         </button>
+
+        <span className="font-medium italic text-gray-600">
+          Note: Only All/SCOs are functioning (try the others at ur own risk/j)
+        </span>
       </div>
 
       <div className="flex-1 flex items-center justify-center">
@@ -187,17 +228,13 @@ export default function Home() {
     ctx.drawImage(img, 0, 0);
     const data = ctx.getImageData(0, 0, img.width, img.height).data;
 
-    let r = 0,
-      g = 0,
-      b = 0;
+    let r = 0, g = 0, b = 0;
     const pixelCount = img.width * img.height;
-
     for (let i = 0; i < data.length; i += 4) {
       r += data[i];
       g += data[i + 1];
       b += data[i + 2];
     }
-
     return { r: r / pixelCount, g: g / pixelCount, b: b / pixelCount };
   }
 
@@ -208,7 +245,6 @@ export default function Home() {
   function findClosestObjekt(avgColor: RGB) {
     let best = objektColors[0];
     let minDist = colorDistance(avgColor, best.avg);
-
     for (const obj of objektColors) {
       const dist = colorDistance(avgColor, obj.avg);
       if (dist < minDist) {
@@ -216,7 +252,6 @@ export default function Home() {
         best = obj;
       }
     }
-
     return best;
   }
 }
