@@ -248,7 +248,7 @@ export default function Home() {
             Save File (Embedded SVG)
           </button>
           <span className="font-medium text-gray-600">
-            SVG files will retain the original quality of Objekts. Try zooming in! (Warning: "Embedded" will be incredibly large, however it can be accessed locally. "Linked" is <span className="font-bold text-black">highly</span> recommended but requires internet connection + open the file on your browser.)
+            SVG files will retain the original quality of Objekts. Try zooming in! (Warning: Embedded will be incredibly large, however it can be accessed locally. Linked is <span className="font-bold text-black">highly</span> recommended but requires internet connection + open the file on your browser.)
           </span>
         </div>
 
