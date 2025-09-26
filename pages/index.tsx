@@ -13,21 +13,16 @@ export default function Home() {
   const [count, setCount] = useState(50);
   const [selectedClass, setSelectedClass] = useState<ClassType>(null);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [fileName, setFileName] = useState(
-    "No file chosen yet."
-  );
+  const [fileName, setFileName] = useState("No file chosen yet.");
 
   const [objektColors, setObjektColors] = useState<ObjektWithAvg[]>([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [lastMosaicTiles, setLastMosaicTiles] = useState<
+    { x: number; y: number; w: number; h: number; image: string }[]
+  >([]);
 
   useEffect(() => {
-    let source: typeof allObjekts;
-
-    if (selectedClass === "Special") {
-      source = specialClassObjekts;
-    } else {
-      source = allObjekts;
-    }
+    const source = selectedClass === "Special" ? specialClassObjekts : allObjekts;
 
     const loadObjekts = async () => {
       const results: ObjektWithAvg[] = await Promise.all(
@@ -47,25 +42,6 @@ export default function Home() {
 
     loadObjekts();
   }, [selectedClass]);
-
-  // preview
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const img = new window.Image();
-    img.crossOrigin = "anonymous";
-    img.src = uploadedImage || "/defaultImage.jpg";
-
-    img.onload = () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, img.width, img.height);
-    };
-  }, [uploadedImage]);
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -95,6 +71,8 @@ export default function Home() {
       canvas.width = img.width;
       canvas.height = rows * tileHeight;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const newTiles: { x: number; y: number; w: number; h: number; image: string }[] = [];
 
       for (let y = 0; y < rows; y++) {
         for (let x = 0; x < cols; x++) {
@@ -135,26 +113,102 @@ export default function Home() {
           tileImg.onload = () => {
             ctx.drawImage(tileImg, x * tileWidth, y * tileHeight, tileWidth, tileHeight);
           };
+
+          newTiles.push({
+            x: x * tileWidth,
+            y: y * tileHeight,
+            w: tileWidth,
+            h: tileHeight,
+            image: closestObjekt.image,
+          });
         }
       }
+
+      setLastMosaicTiles(newTiles);
     };
+  };
+
+  // png
+  const handleSaveImage = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.download = "mosaic.png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  };
+
+  // svg 1 (linked)
+  const handleSaveSVG = () => {
+    if (lastMosaicTiles.length === 0) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const svgParts: string[] = [];
+    svgParts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">`);
+    lastMosaicTiles.forEach((tile) => {
+      svgParts.push(
+        `<image href="${tile.image}" x="${tile.x}" y="${tile.y}" width="${tile.w}" height="${tile.h}" />`
+      );
+    });
+    svgParts.push("</svg>");
+
+    const blob = new Blob([svgParts.join("\n")], { type: "image/svg+xml" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "mosaic_linked.svg";
+    link.click();
+  };
+
+  // svg 2 (b64)
+  const handleSaveSVGBase64 = async () => {
+    if (lastMosaicTiles.length === 0) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const svgParts: string[] = [];
+    svgParts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">`);
+
+    for (const tile of lastMosaicTiles) {
+      const img = new window.Image();
+      img.crossOrigin = "anonymous";
+      img.src = tile.image;
+
+      await new Promise<void>((resolve) => {
+        img.onload = () => {
+          const tmpCanvas = document.createElement("canvas");
+          tmpCanvas.width = img.width;
+          tmpCanvas.height = img.height;
+          const tmpCtx = tmpCanvas.getContext("2d")!;
+          tmpCtx.drawImage(img, 0, 0);
+          const dataUrl = tmpCanvas.toDataURL("image/png");
+
+          svgParts.push(
+            `<image href="${dataUrl}" x="${tile.x}" y="${tile.y}" width="${tile.w}" height="${tile.h}" />`
+          );
+          resolve();
+        };
+      });
+    }
+
+    svgParts.push("</svg>");
+    const blob = new Blob([svgParts.join("\n")], { type: "image/svg+xml" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "mosaic_base64.svg";
+    link.click();
   };
 
   return (
     <div className="flex h-screen bg-white text-black">
-      <div className="w-1/6 min-w-[200px] border-r border-gray-300 p-6 flex flex-col gap-6">
+      <div className="w-1/6 min-w-[200px] border-r border-gray-300 p-6 flex flex-col gap-6 h-screen overflow-y-auto">
         <h2 className="text-xl font-bold">Objekt Mosaic</h2>
 
         <div className="flex flex-col gap-2">
           <label className="font-bold">Upload Image</label>
           <label className="border border-black px-4 py-2 cursor-pointer text-center rounded hover:bg-gray-200 transition-colors duration-200">
             Choose File
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleUpload}
-              className="hidden"
-            />
+            <input type="file" accept="image/*" onChange={handleUpload} className="hidden" />
           </label>
           <span className="text-sm text-gray-600 mt-1">{fileName}</span>
         </div>
@@ -162,54 +216,44 @@ export default function Home() {
         <span className="font-bold">Customise</span>
         <div className="flex flex-col gap-2">
           <label className="font-medium">Count: {count}</label>
-          <input
-            type="range"
-            min={5}
-            max={150}
-            value={count}
-            onChange={(e) => setCount(Number(e.target.value))}
-          />
+          <input type="range" min={5} max={150} value={count} onChange={(e) => setCount(Number(e.target.value))} />
         </div>
 
         <div className="flex flex-col gap-2">
           <span className="font-medium">Select Class</span>
           <div className="flex flex-col gap-1">
-            <button
-              onClick={() => setSelectedClass(null)}
-              className={`mt-2 px-3 py-1 rounded border text-sm ${
-                selectedClass === null
-                  ? "bg-black text-white border-black"
-                  : "bg-white text-black border-gray-400 hover:bg-gray-200"
-              }`}
-            >
+            <button onClick={() => setSelectedClass(null)} className={`mt-2 px-3 py-1 rounded border text-sm ${selectedClass === null ? "bg-black text-white border-black" : "bg-white text-black border-gray-400 hover:bg-gray-200"}`}>
               All (Default)
             </button>
             {CLASSES.map((cls) => (
-              <button
-                key={cls}
-                onClick={() => setSelectedClass(cls)}
-                className={`px-3 py-1 rounded border text-sm ${
-                  selectedClass === cls
-                    ? "bg-black text-white border-black"
-                    : "bg-white text-black border-gray-400 hover:bg-gray-200"
-                }`}
-              >
+              <button key={cls} onClick={() => setSelectedClass(cls)} className={`px-3 py-1 rounded border text-sm ${selectedClass === cls ? "bg-black text-white border-black" : "bg-white text-black border-gray-400 hover:bg-gray-200"}`}>
                 {cls}
               </button>
             ))}
-            
           </div>
         </div>
 
-        <button
-          onClick={handleGenerate}
-          className="bg-black text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors duration-200"
-        >
+        <button onClick={handleGenerate} className="bg-black text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors duration-200">
           Generate Mosaic
         </button>
 
+        <div className="flex flex-col gap-2 mt-4">
+          <button onClick={handleSaveImage} className="border border-black px-4 bg-white text-black px-4 py-2 rounded hover:bg-gray-200 transition-colors duration-200">
+            Save Image (PNG)
+          </button>
+          <button onClick={handleSaveSVG} className="border border-black px-4 bg-white text-black px-4 py-2 rounded hover:bg-gray-200 transition-colors duration-200">
+            Save File (Linked SVG)
+          </button>
+          <button onClick={handleSaveSVGBase64} className="border border-black px-4 bg-white text-black px-4 py-2 rounded hover:bg-gray-200 transition-colors duration-200">
+            Save File (Embedded SVG)
+          </button>
+          <span className="font-medium text-gray-600">
+            SVG files will retain the original quality of Objekts. Try zooming in! (Warning: "Embedded" will be incredibly large, however it can be accessed locally. "Linked" is <span className="font-bold text-black">highly</span> recommended but requires internet connection + open the file on your browser.)
+          </span>
+        </div>
+
         <span className="font-medium italic text-gray-600">
-          Note: Only All/SCOs are functioning (try the others at ur own risk/j)
+          As of now, only All Objekts/SCOs are functioning.
         </span>
       </div>
 
@@ -227,13 +271,10 @@ export default function Home() {
     const ctx = canvas.getContext("2d")!;
     ctx.drawImage(img, 0, 0);
     const data = ctx.getImageData(0, 0, img.width, img.height).data;
-
     let r = 0, g = 0, b = 0;
     const pixelCount = img.width * img.height;
     for (let i = 0; i < data.length; i += 4) {
-      r += data[i];
-      g += data[i + 1];
-      b += data[i + 2];
+      r += data[i]; g += data[i + 1]; b += data[i + 2];
     }
     return { r: r / pixelCount, g: g / pixelCount, b: b / pixelCount };
   }
@@ -247,10 +288,7 @@ export default function Home() {
     let minDist = colorDistance(avgColor, best.avg);
     for (const obj of objektColors) {
       const dist = colorDistance(avgColor, obj.avg);
-      if (dist < minDist) {
-        minDist = dist;
-        best = obj;
-      }
+      if (dist < minDist) { minDist = dist; best = obj; }
     }
     return best;
   }
