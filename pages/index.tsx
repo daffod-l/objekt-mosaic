@@ -252,7 +252,7 @@ export default function Home() {
           </span>
         </div>
 
-        <span className="font-medium italic text-gray-600">
+        <span className="font-medium text-gray-600">
           As of now, only All Objekts/SCOs are functioning.
         </span>
       </div>
