@@ -3,3 +3,5 @@
 A photomosaic generator with tripleS Objekts!
 
 "All" Objekts only includes those in Atom01 at the moment. More customisations (Season, class, member) will be added soon.
+
+Objekts retrieved from henryyyzzz98's [Spin Simulator](https://github.com/henryyyzzz98/henryyyzzz98.github.io) 
